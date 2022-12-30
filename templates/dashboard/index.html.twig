@@ -1,0 +1,131 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Hello DashboardController!{% endblock %}
+
+{% block body %}
+<style>
+    #map{
+        height: 600px;
+        margin: auto;
+        width: 80%;
+        border: 1px solid black;
+        padding: 10px;
+    }
+
+    .legend i {
+        width: 18px;
+        height: 18px;
+        float: left;
+        margin-right: 8px;
+        opacity: 0.7;
+    }
+</style>
+
+    {{ dump(trafficData) }}
+
+    <h1>El mapa de tráfico de valencia</h1>
+    <div id="map"></div>
+
+    <script>
+
+        const map = L.map('map').setView([39.4697500,-0.3773900], 13);
+
+        const tiles = L.tileLayer('https://{s}.tile.jawg.io/jawg-light/{z}/{x}/{y}{r}.png?access-token={accessToken}', {
+            attribution: '',
+            minZoom: 0,
+            maxZoom: 22,
+            subdomains: 'abcd',
+            accessToken: 'b4NYmXgJuAaOktmRXue3bX81NWQe5wRxc2grCaVnrn2CddrPEovEAZldSdGWRyjt'
+        }).addTo(map);
+
+        var legend = L.control({position: 'bottomright'});
+
+        legend.onAdd = function (map) {
+
+            var div = L.DomUtil.create('div', 'info legend'),
+                grades = [0, 400, 800, 1200, 1600, 2000, 2400, 2800],
+                labels = [];
+
+            // loop through our density intervals and generate a label with a colored square for each interval
+            for (var i = 0; i < grades.length; i++) {
+                div.innerHTML +=
+                    '<i style="background:' + getColor(grades[i] + 1) + '"></i> ' +
+                    grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
+            }
+
+            return div;
+        };
+
+        legend.addTo(map);
+
+        var trafficData =  {{ trafficData|json_encode|raw }}
+
+        L.geoJSON(trafficData, {
+            style: style,
+            onEachFeature(feature, layer) {
+                if (feature.properties && feature.properties.des_tramo && feature.properties.lectura) {
+                    layer.bindPopup(
+                        '<strong>Tramo:</strong> ' + feature.properties.des_tramo +
+                        '<br>' +
+                        '<strong>Trafico:</strong> ' + feature.properties.lectura,
+                        {closeButton: false, offset: L.point(0, 0)}
+                    );
+                    layer.on('mouseover', function() { layer.openPopup(); });
+                    layer.on('mouseout', function() { layer.closePopup(); });
+                }
+            }
+        }).addTo(map);
+
+        console.log({{ pollutionData|json_encode|raw }});
+        pollutionData = {{ pollutionData|json_encode|raw }};
+
+        L.geoJSON(pollutionData, {
+            style : function(feature) {
+                return feature.properties && feature.properties.style;
+            },
+            onEachFeature: function(feature, layer) {
+                let popupContent = `<p>I started out as a GeoJSON ${feature.geometry.type}, but now I'm a Leaflet vector!</p>`;
+
+                if (feature.properties && feature.properties.prop0) {
+                    popupContent += feature.properties.prop0;
+                }
+                layer.bindPopup(popupContent);
+            },
+            pointToLayer : function(feature, latlng) {
+                return L.circleMarker(latlng, {
+                    radius : 2,
+                    fillColor : "#ff7800",
+                    color : "#000",
+                    weight : 1,
+                    opacity : 1,
+                    fillOpacity : 0.8
+                });
+            }
+        }).addTo(map);
+
+
+        function getColor(d) {
+            return d > 2800 ? '#800026' :
+                d > 2400  ? '#BD0026' :
+                    d > 2000  ? '#E31A1C' :
+                        d > 1600  ? '#FC4E2A' :
+                            d > 1200   ? '#FD8D3C' :
+                                d > 800   ? '#FEB24C' :
+                                    d > 400   ? '#FED976' :
+                                        '#FFEDA0';
+        }
+
+        function style(feature) {
+            return {
+                color: getColor(parseInt(feature.properties.lectura)),
+                weight: 4,
+                opacity: 1,
+                // color: 'white',
+                // dashArray: '3',
+                // fillOpacity: 0.7
+            };
+        }
+    </script>
+
+
+{% endblock %}
